@@ -2,8 +2,10 @@ import { EventManager } from "./event-manager";
 import { Faery } from "./faery";
 
 type WatnessEvents = {
+    "active": {},
     "canvasmove": [x: number, y: number],
     "click": [x: number, y: number],
+    "rightclick": [x: number, y: number],
     "cursormove": [dx: number, dy: number],
     "cursorexit": {},
     "keydown": string,
@@ -103,8 +105,17 @@ export class WatnessCanvas extends EventManager<WatnessEvents> {
         });
 
         this.canvas.addEventListener("click", (evt) => {
-            this.fire("click", getMouseLocation(evt));
+            this.fire("active", {});
         });
+
+        const onRightClick = (evt: MouseEvent) => {
+            if (evt.button === 0) {
+                this.fire("click", getMouseLocation(evt));
+            } else if (evt.button === 2) {
+                this.fire("rightclick", getMouseLocation(evt));
+            }
+            evt.preventDefault();
+        }
 
         const onCursorMove = (evt: MouseEvent) => {
             this.fire("cursormove", [evt.movementX, evt.movementY]);
@@ -121,15 +132,16 @@ export class WatnessCanvas extends EventManager<WatnessEvents> {
         }
 
         document.addEventListener("pointerlockchange", (evt) => {
-            console.log(evt, document.pointerLockElement);
             if (document.pointerLockElement === this.canvas) {
                 document.addEventListener("mousemove", onCursorMove);
                 document.addEventListener("keydown", onKeyDown);
                 document.addEventListener("keyup", onKeyUp);
+                document.addEventListener("mousedown", onRightClick);
             } else {
                 document.removeEventListener("mousemove", onCursorMove);
                 document.removeEventListener("keydown", onKeyDown);
                 document.removeEventListener("keyup", onKeyUp);
+                document.removeEventListener("mousedown", onRightClick);
                 this.fire("cursorexit", {});
             }
         });

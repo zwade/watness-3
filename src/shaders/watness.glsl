@@ -1,57 +1,17 @@
-#ifdef GL_ES
-	precision lowp float;
-#endif
-#define PATH_LEN 100
-
-uniform float time;
-uniform float dt;
-uniform vec2 resolution;
 uniform vec2 mouse;
 uniform vec2 footLocation;
-uniform ivec4 loopback[300];
-varying vec3 surface_loc;
-varying vec3 color;
-varying vec3 focus;
 
-
-#define PATH 0.0
-#define MOUSE_LOCATION 100.0
-#define PLAYER_LOCATION 102.0
-#define VIEW_ANGLE 104.0
-#define ACTIVE_PUZZLE 120.0
-#define KEY_LEFT 200.0
-#define KEY_RIGHT 201.0
-#define KEY_UP 202.0
-#define KEY_DOWN 203.0
-#define CLICK 204.0
-#define RIGHT_CLICK 205.0
-#define MOUSE_DELTA 210.0
-
-#define imin(x,y) (x < y ? x : y)
-#define minmax(x, minval, maxval) (min(max(x, minval), maxval))
-
-#define read_float(addr, scale) fromWTFloat(loopback[addr].xyz) * scale
-#define read_byte(addr) loopback[addr].x
-#define read_ivec2(addr) loopback[addr].xy
-#define read_ivec3(addr) loopback[addr].xyz
-#define read_bool(addr) (loopback[addr].x == 0 ? false : true)
-#define at_addr(addr, exp) if (gl_FragCoord.y <= 1.0 && gl_FragCoord.x > addr && gl_FragCoord.x <= addr + 1.0) { gl_FragColor = exp; return; }
-#define write_float(addr, value, scale) at_addr(addr, vec4(toWTFloat((value) / (scale)), 0.0))
-#define write_byte(addr, value) at_addr(addr, vec4(float(value) / 255.0, 0, 0, 0))
-#define write_ivec2(addr, value) at_addr(addr, vec4(float(value.xy) / 255.0, 0, 0))
-#define write_ivec3(addr, value) at_addr(addr, vec4(float(value.x) / 255.0, float(value.y) / 255.0, float(value.z) / 255.0, 0))
-#define write_bool(addr, value) at_addr(addr, vec4(value ? 1.0 : 0.0, 0, 0, 0))
-
-const int width = 9;
-const int height = 9;
+const int width = 10;
+const int height = 10;
 const float radius = 0.03;
-const float PI = 3.1415;
 const float scale = 0.50;
 
 const vec4 pale_yellow = vec4(1.0, 1.0, 0.8, 1.0);
 const vec4 default_empty = vec4(1.0, 0.0, 0.2, 1.0);
 const vec4 orange = vec4(1.0, 0.6, 0.0, 1.0);
-
+const vec4 cyan = vec4(0, 0.67, 0.76, 1.0);
+const vec4 foliage = vec4(0.22, 0.56, 0.24, 1.0);
+const vec4 cursor = vec4(1, 1, 1, 0.8);
 
 int iabs(int x) {
     return x >= 0 ? x : -x;
@@ -64,23 +24,6 @@ float dist(vec2 a, vec2 b) {
 
 float round(float a) {
     return floor(a + 0.5);
-}
-
-float fromWTFloat(ivec3 inp) {
-    return (
-        float(inp.x) * 256.0 * 256.0 +
-        float(inp.y) * 256.0 +
-        float(inp.z)
-    ) / (256.0 * 256.0 * 256.0) * 2.0;
-}
-
-vec3 toWTFloat(float x) {
-    float bigboi = (x / 2.0) * 256.0 * 256.0 * 256.0;
-    return vec3(
-        floor(bigboi / (256.0 * 256.0)) / 256.0,
-        floor(mod(bigboi, 256.0 * 256.0) / 256.0) / 256.0,
-        floor(mod(bigboi, 256.0)) / 256.0
-    );
 }
 
 bool is_node(vec2 position, out ivec2 where) {
@@ -164,7 +107,7 @@ bool node_is_on_path(ivec2 where) {
 bool v_edge_is_on_path(ivec2 where) {
     for (int i = 0; i < PATH_LEN - 1; i++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
-        ivec3 next = read_ivec3(int(PATH ) + i + 1);
+        ivec3 next = read_ivec3(int(PATH) + i + 1);
         if (next == ivec3(255, 255, 1)) {
             return false;
         }
@@ -178,7 +121,7 @@ bool v_edge_is_on_path(ivec2 where) {
 bool h_edge_is_on_path(ivec2 where) {
     for (int i = 0; i < PATH_LEN - 1; i ++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
-        ivec3 next = read_ivec3(int(PATH ) + i + 1);
+        ivec3 next = read_ivec3(int(PATH) + i + 1);
         if (next == ivec3(255, 255, 1)) {
             return false;
         }
@@ -194,7 +137,7 @@ bool is_valid_next_segment(ivec2 where) {
         return false;
     }
 
-    if (where == ivec2(0, 0) && read_ivec3(int(PATH)) == ivec3(255, 255, 1)) {
+    if (where == ivec2(0, 0) && read_ivec3(PATH) == ivec3(255, 255, 1)) {
         return true;
     }
 
@@ -211,115 +154,24 @@ bool is_valid_next_segment(ivec2 where) {
     }
 }
 
-vec2 normalizeMouse() {
-    float mouseX = read_float(int(MOUSE_LOCATION), 1.0);
-    float mouseY = read_float(int(MOUSE_LOCATION) + 1, 1.0);
-    float mouseDx = read_float(int(MOUSE_DELTA), 1.0) - 0.5;
-    float mouseDy = read_float(int(MOUSE_DELTA) + 1, 1.0) - 0.5;
-
-    vec2 mouse = (vec2(mouseX + mouseDx, mouseY + mouseDy) - 0.5) * 2.0;
-    vec2 bounded = minmax(mouse, vec2(-1, -1), vec2(1, 1));
-    vec2 normalized = (bounded + vec2(1, 1)) / 2.0;
-    vec2 haligned = vec2(
-        round(normalized.x * float(width - 1)) / float(width - 1),
-        normalized.y
-    );
-    vec2 valigned = vec2(
-        normalized.x,
-        round(normalized.y * float(height - 1)) / float(height - 1)
-    );
-
-    if (dist(haligned, normalized) < dist(valigned, normalized)) {
-        return haligned * 2.0 - vec2(1, 1);
-    } else {
-        return valigned * 2.0 - vec2(1, 1);
-    }
-}
-
-vec2 normalizeLocation() {
-    float baseX = read_float(int(PLAYER_LOCATION), 1.0);
-    float baseY = read_float(int(PLAYER_LOCATION) + 1, 1.0);
-    vec2 base = vec2(baseX, baseY);
-    if (read_bool(int(KEY_UP))) {
-        base.y += 0.002 * dt;
-    }
-    if (read_bool(int(KEY_DOWN))) {
-        base.y -= 0.002 * dt;
-    }
-    if (read_bool(int(KEY_LEFT))) {
-        base.x -= 0.002 * dt;
-    }
-    if (read_bool(int(KEY_RIGHT))) {
-        base.x += 0.002 * dt;
-    }
-
-    return minmax(base, vec2(0, 0), vec2(1, 1));
-}
-
-vec2 normalizeRotation() {
-
-}
-
-void main( void ) {
-    vec4 empty = default_empty;
-
-    vec2 newMouse = normalizeMouse();
-    vec2 newLocation = normalizeLocation();
-
-    vec2 aspectRatio = vec2(resolution.x / resolution.y, 1.0);
-	// vec2 position =
-    //     vec2((newLocation.x - 0.5) * 20.0, 0)
-    //     + (2.0 * gl_FragCoord.xy / vec2(resolution.y, resolution.y) - aspectRatio) / scale / (newLocation.y + 0.5);
-    // vec2 position = (surface_loc.xy * aspectRatio) / scale;
-    vec3 center = vec3(0, 0, 3);
-    vec3 normal = vec3(0, 0, -1);
-    vec3 viewVector = surface_loc - focus;
+bool rayIntersectsPlane(vec3 ray, vec3 center, vec3 xAxis, vec3 yAxis, out vec2 where) {
+    vec3 normal = cross(xAxis, yAxis);
+    vec3 viewVector = ray - focus;
     vec3 normalizedView = viewVector / sqrt(dot(viewVector, viewVector));
     float projection = dot(normalizedView, normal);
     float t = (-dot(focus - center, normal)) / projection;
     vec3 pointOnPlane = focus + normalizedView * t;
-    vec2 position = pointOnPlane.xy * aspectRatio;
+    float xComponent = dot(pointOnPlane, xAxis) / dot(xAxis, xAxis);
+    float yComponent = dot(pointOnPlane, yAxis) / dot(yAxis, yAxis);
 
-    float distToMouse = sqrt(pow(position.x - newMouse.x, 2.0) + pow(position.y - newMouse.y, 2.0));
-    // vec4 empty = vec4(color.xyz, 1); // vec4(0.9, 0.0, 0.2, 1.0);
-    if (distToMouse < radius) {
-        gl_FragColor = orange;
-        return;
+    if (t > 0.0 && xComponent >= -1.0 && xComponent <= 1.0 && yComponent >= -1.0 && yComponent <= 1.0) {
+        where = vec2(xComponent, yComponent);
+        return true;
     }
+    return false;
+}
 
-    write_float(MOUSE_LOCATION, newMouse.x / 2.0 + 0.5, 1.0)
-    write_float(MOUSE_LOCATION + 1.0, newMouse.y / 2.0 + 0.5, 1.0)
-    write_float(PLAYER_LOCATION, newLocation.x, 1.0)
-    write_float(PLAYER_LOCATION + 1.0, newLocation.y, 1.0)
-
-    int next_segment = 0;
-    for (int i = 0; i < PATH_LEN; i++) {
-        ivec3 loc = read_ivec3(int(PATH) + i);
-        if (loc == ivec3(255, 255, 1)) {
-            next_segment = i;
-            break;
-        }
-    }
-    for (int i = 0; i < PATH_LEN; i++) {
-        ivec3 loc = read_ivec3(int(PATH) + i);
-        if (loc.z == 0) {
-            write_ivec3(PATH + float(i), ivec3(255, 255, 1))
-        }
-        if (i == next_segment) {
-            ivec2 nextNode;
-            if (is_node(newMouse, nextNode) && is_valid_next_segment(nextNode)) {
-                write_ivec3(PATH + float(i), ivec3(nextNode.xy, 1))
-            }
-        }
-
-        write_ivec3(PATH + float(i), ivec3(loc.xy, 1))
-    }
-
-    if (gl_FragCoord.y <= 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
-        return;
-    }
-
+void drawPuzzle(vec2 position) {
 	ivec2 where;
     if (is_node(position, where)) {
         if (node_is_on_path(where)) {
@@ -344,6 +196,152 @@ void main( void ) {
             gl_FragColor = pale_yellow;
         }
     } else {
-        gl_FragColor = empty;
+        gl_FragColor = default_empty;
     }
+}
+
+vec2 normalizeMouse() {
+    if (read_byte(ACTIVE_PUZZLE) == 0) {
+        return vec2(-1, -1);
+    }
+
+    vec2 mouseLocation = read_vec2(MOUSE_LOCATION, 1.0);
+    vec2 mouseDelta = read_vec2(MOUSE_DELTA, 1.0) - 0.5;
+
+    vec2 mouse = (mouseLocation + mouseDelta - 0.5) * 2.0;
+    vec2 bounded = minmax(mouse, vec2(-1, -1), vec2(1, 1));
+    vec2 normalized = (bounded + vec2(1, 1)) / 2.0;
+    vec2 haligned = vec2(
+        round(normalized.x * float(width - 1)) / float(width - 1),
+        normalized.y
+    );
+    vec2 valigned = vec2(
+        normalized.x,
+        round(normalized.y * float(height - 1)) / float(height - 1)
+    );
+
+    if (dist(haligned, normalized) < dist(valigned, normalized)) {
+        return haligned * 2.0 - vec2(1, 1);
+    } else {
+        return valigned * 2.0 - vec2(1, 1);
+    }
+}
+
+vec2 normalizeLocation() {
+    vec2 base = read_vec2(PLAYER_LOCATION, 1.0);
+
+    if (read_byte(ACTIVE_PUZZLE) == 0) {
+        vec3 viewVector = viewport_center - focus;
+        vec3 unnormalizedForwardProjection = vec3(viewVector.x, viewVector.z, 0);
+        vec3 forwardProjection =
+            unnormalizedForwardProjection / sqrt(
+                dot(unnormalizedForwardProjection, unnormalizedForwardProjection)
+            );
+        vec3 sideProjection = cross(forwardProjection, vec3(0, 0, 1));
+
+        if (read_bool(KEY_UP)) {
+            base += 0.01 * forwardProjection.xy;
+        }
+        if (read_bool(KEY_DOWN)) {
+            base -= 0.01 * forwardProjection.xy;
+        }
+        if (read_bool(KEY_LEFT)) {
+            base -= 0.01 * sideProjection.xy;
+        }
+        if (read_bool(KEY_RIGHT)) {
+            base += 0.01 * sideProjection.xy;
+        }
+    }
+
+    return minmax(base, vec2(0, 0), vec2(1, 1));
+}
+
+vec2 normalizeRotation() {
+    vec2 rotation = read_vec2(VIEW_ANGLE, 2.0 * PI);
+    if (read_byte(ACTIVE_PUZZLE) == 0) {
+        vec2 mouseDelta = read_vec2(MOUSE_DELTA, 1.0) - 0.5;
+        rotation = rotation - mouseDelta;
+    }
+    rotation = mod(rotation + 2.0 * PI, 2.0 * PI);
+    return rotation;
+}
+
+void main() {
+    vec4 empty = default_empty;
+
+    vec2 newMouse = normalizeMouse();
+    vec2 newLocation = normalizeLocation();
+    vec2 rotation = normalizeRotation();
+    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+
+    write_float(MOUSE_LOCATION, newMouse.x / 2.0 + 0.5, 1.0)
+    write_float(MOUSE_LOCATION + 1.0, newMouse.y / 2.0 + 0.5, 1.0)
+    write_float(PLAYER_LOCATION, newLocation.x, 1.0)
+    write_float(PLAYER_LOCATION + 1.0, newLocation.y, 1.0)
+    write_float(VIEW_ANGLE, rotation.x, 2.0 * PI)
+    write_float(VIEW_ANGLE + 1.0, rotation.y, 2.0 * PI)
+
+    int next_segment = 0;
+    for (int i = 0; i < PATH_LEN; i++) {
+        ivec3 loc = read_ivec3(int(PATH) + i);
+        if (loc == ivec3(255, 255, 1)) {
+            next_segment = i;
+            break;
+        }
+    }
+    for (int i = 0; i < PATH_LEN; i++) {
+        ivec3 loc = read_ivec3(int(PATH) + i);
+        if (loc.z == 0) {
+            write_ivec3(PATH + float(i), ivec3(255, 255, 1))
+        }
+        if (i == next_segment) {
+            ivec2 nextNode;
+            if (is_node(newMouse, nextNode) && is_valid_next_segment(nextNode)) {
+                write_ivec3(PATH + float(i), ivec3(nextNode.xy, 1))
+            }
+        }
+
+        write_ivec3(PATH + float(i), ivec3(loc.xy, 1))
+    }
+
+    vec2 where;
+    vec3 center = vec3(0, 0, 3);
+    vec3 xAxis = vec3(1, 0, 0);
+    vec3 yAxis = vec3(0, 1, 0);
+
+    if (read_bool(CLICK) && rayIntersectsPlane(viewport_center, center, xAxis, yAxis, where)) {
+        activePuzzle = 1;
+    }
+
+    if (read_bool(RIGHT_CLICK) && activePuzzle != 0) {
+        activePuzzle = 0;
+    }
+
+    write_byte(ACTIVE_PUZZLE, activePuzzle);
+
+    if (gl_FragCoord.y <= 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+        return;
+    }
+
+    if (rayIntersectsPlane(surface_loc, center, xAxis, yAxis, where)) {
+        where = where * 1.1;
+        float distToMouse = sqrt(pow(where.x - newMouse.x, 2.0) + pow(where.y - newMouse.y, 2.0));
+        if (distToMouse < radius) {
+            gl_FragColor = orange;
+        } else {
+            drawPuzzle(where);
+        }
+    } else if (rayIntersectsPlane(surface_loc, vec3(0, -2.0, 0), vec3(0, 0, 10), vec3(10, 0, 0), where)) {
+        gl_FragColor = foliage;
+    } else if (rayIntersectsPlane(surface_loc, vec3(0, 100, 50), vec3(0, 7, -7), vec3(10, 0, 0), where)) {
+        gl_FragColor = orange;
+    } else {
+        gl_FragColor = cyan;
+    }
+
+    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+        gl_FragColor = vec4(gl_FragColor.rgb * (1.0 - cursor.a) + cursor.rgb * cursor.a, 1.0);
+    }
+
 }
