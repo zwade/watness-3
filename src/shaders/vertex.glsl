@@ -3,7 +3,7 @@ attribute vec3 myInput;
 
 void main() {
     vec2 aspectRatio = vec2(1.0, resolution.x / resolution.y);
-	vec4 base_position = vec4(position.xy / aspectRatio, 2.5, 1);
+	vec4 base_position = vec4(position.xy / aspectRatio, 2, 1);
 	gl_Position = vec4(position.xyz, 1);
 
 	vec2 rotation = read_vec2(VIEW_ANGLE, 2.0 * PI);
@@ -24,9 +24,9 @@ void main() {
 	);
 
 	mat4 translation_mat = mat4(
-		vec4(1, 0, 0, (footLocation.x - 0.5) * 20.0),
+		vec4(1, 0, 0, (footLocation.x - 0.5) * 18.0),
 		vec4(0, 1, 0, 0),
-		vec4(0, 0, 1, (footLocation.y - 0.5) * 20.0),
+		vec4(0, 0, 1, (footLocation.y - 0.5) * 18.0),
 		vec4(0, 0, 0, 1)
 	);
 

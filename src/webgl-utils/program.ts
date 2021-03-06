@@ -131,6 +131,16 @@ export class Program<T extends Uniforms> {
                 );
                 break;
             }
+            case UniformKind.Texture: {
+                const a = attr as UniformKindToValue<UniformKind.Texture>;
+                this.gl.activeTexture(this.gl[`TEXTURE${a.id}` as "TEXTURE0"]);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, a.texture);
+                this.gl.uniform1i(
+                    this.gl.getUniformLocation(this.program, name),
+                    a.id
+                );
+                break;
+            }
         }
     }
 

@@ -54,6 +54,12 @@ module.exports = {
                 ]
             },
             {
+                test: /\.(jpg|png)$/i,
+                use: [
+                    'file-loader',
+                ]
+            },
+            {
                 test: /\.glsl$/i,
                 use: [
                     'raw-loader'

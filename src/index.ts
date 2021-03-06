@@ -1,9 +1,11 @@
 import commonSource from "./shaders/common.glsl";
 import vertexSource from "./shaders/vertex.glsl";
 import fragmentSource from "./shaders/watness.glsl";
+import witnessImage from "./assets/the-witness.png";
 import { AttrKind, Faery, Triangles, WatnessCanvas } from "./webgl-utils";
 import { AttribKind } from "./webgl-utils/geometry";
 import { Program } from "./webgl-utils/program";
+import { Texture } from "./webgl-utils/uniform";
 
 const mouseSpeed = 0.002;
 const TRUE:  [number, number, number, number] = [1, 0, 0, 0];
@@ -34,10 +36,12 @@ export const main = async () => {
             dt: AttrKind.Float,
             resolution: AttrKind.Float2,
             loopback: AttrKind.Int4Vec,
+            introImage: AttrKind.Texture,
         },
         {
             time: 0,
             resolution: [canvas.width, canvas.height],
+            introImage: new Texture(canvas.gl, 0, witnessImage),
         }
     );
     const fullScreen = new Triangles(

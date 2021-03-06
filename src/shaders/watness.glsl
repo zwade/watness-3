@@ -1,8 +1,9 @@
 uniform vec2 mouse;
 uniform vec2 footLocation;
+uniform sampler2D introImage;
 
-const int width = 10;
-const int height = 10;
+const int width = 8;
+const int height = 8;
 const float radius = 0.03;
 const float scale = 0.50;
 
@@ -11,7 +12,18 @@ const vec4 default_empty = vec4(1.0, 0.0, 0.2, 1.0);
 const vec4 orange = vec4(1.0, 0.6, 0.0, 1.0);
 const vec4 cyan = vec4(0, 0.67, 0.76, 1.0);
 const vec4 foliage = vec4(0.22, 0.56, 0.24, 1.0);
+const vec4 foliageShadow = vec4(0.11, 0.37, 0.13, 1.0);
+const vec4 gray600 = vec4(0.38, 0.49, 0.55, 1.0);
+const vec4 gray900 = vec4(0.15, 0.20, 0.22, 1.0);
 const vec4 cursor = vec4(1, 1, 1, 0.8);
+const vec4 shadow = vec4(0, 0, 0, 0.8);
+
+struct Plane {
+    int id;
+    vec3 center;
+    vec3 xAxis;
+    vec3 yAxis;
+};
 
 int iabs(int x) {
     return x >= 0 ? x : -x;
@@ -24,6 +36,10 @@ float dist(vec2 a, vec2 b) {
 
 float round(float a) {
     return floor(a + 0.5);
+}
+
+vec4 blend(vec4 base, vec4 overlay) {
+    return vec4(base.rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a, 1.0);
 }
 
 bool is_node(vec2 position, out ivec2 where) {
@@ -154,25 +170,77 @@ bool is_valid_next_segment(ivec2 where) {
     }
 }
 
-bool rayIntersectsPlane(vec3 ray, vec3 center, vec3 xAxis, vec3 yAxis, out vec2 where) {
-    vec3 normal = cross(xAxis, yAxis);
-    vec3 viewVector = ray - focus;
-    vec3 normalizedView = viewVector / sqrt(dot(viewVector, viewVector));
+float rayIntersectsPlane(vec3 start, vec3 end, Plane plane, out vec2 planarPosition, out vec3 worldPosition) {
+    vec3 normal = cross(plane.xAxis, plane.yAxis);
+    vec3 ray = end - start;
+    vec3 normalizedView = ray / sqrt(dot(ray, ray));
     float projection = dot(normalizedView, normal);
-    float t = (-dot(focus - center, normal)) / projection;
-    vec3 pointOnPlane = focus + normalizedView * t;
-    float xComponent = dot(pointOnPlane, xAxis) / dot(xAxis, xAxis);
-    float yComponent = dot(pointOnPlane, yAxis) / dot(yAxis, yAxis);
+    float t = (-dot(start - plane.center, normal)) / projection;
+    vec3 pointOnPlane = start + normalizedView * t;
+    vec3 distanceFromCenter = pointOnPlane - plane.center;
+    float xComponent = dot(distanceFromCenter, plane.xAxis) / dot(plane.xAxis, plane.xAxis);
+    float yComponent = dot(distanceFromCenter, plane.yAxis) / dot(plane.yAxis, plane.yAxis);
 
     if (t > 0.0 && xComponent >= -1.0 && xComponent <= 1.0 && yComponent >= -1.0 && yComponent <= 1.0) {
-        where = vec2(xComponent, yComponent);
-        return true;
+        planarPosition = vec2(xComponent, yComponent);
+        worldPosition = pointOnPlane;
+        return t;
     }
-    return false;
+    return -1.0;
 }
 
-void drawPuzzle(vec2 position) {
-	ivec2 where;
+bool findIntersection(vec3 start, vec3 end, Plane planes[6], out vec2 planarPosition, out vec3 worldPosition, out int id) {
+    float bestDist = -1.0;
+    id = -1;
+    for (int i = 0; i < 6; i++) {
+        vec2 pp;
+        vec3 wp;
+        float dist = rayIntersectsPlane(start, end, planes[i], pp, wp);
+        if (dist > 0.0 && (bestDist < 0.0 || dist < bestDist)) {
+            bestDist = dist;
+            id = planes[i].id;
+            planarPosition = pp;
+            worldPosition = wp;
+        }
+    }
+    return bestDist > 0.0;
+}
+
+bool checkLevel1() {
+    for (int i = 0; i < PATH_LEN - 1; i++) {
+        ivec3 current = read_ivec3(int(PATH) + i);
+        ivec3 next = read_ivec3(int(PATH) + i + 1);
+        if (current == ivec3(255, 255, 1)) {
+            return false;
+        }
+        if (current == ivec3(width - 1, height - 1, 1)) {
+            return true;
+        }
+
+
+        float pointX = (float(current.x) + float(next.x)) / (2.0 * float(width));
+        float pointY = (float(current.y) + float(next.y)) / (2.0 * float(height));
+        vec4 data = texture2D(introImage, vec2(pointX, pointY));
+
+        if (data.a >= 1.0) {
+            return false;
+        }
+    }
+
+    return false;
+}
+bool drawPuzzle(vec2 position, vec2 newMouse) {
+    bool isSolved = checkLevel1();
+
+    position *= 1.1;
+    float distToMouse = sqrt(pow(position.x - newMouse.x, 2.0) + pow(position.y - newMouse.y, 2.0));
+
+    if (distToMouse < radius) {
+        gl_FragColor = orange;
+        return true;
+    }
+
+    ivec2 where;
     if (is_node(position, where)) {
         if (node_is_on_path(where)) {
             gl_FragColor = orange;
@@ -195,9 +263,14 @@ void drawPuzzle(vec2 position) {
         } else {
             gl_FragColor = pale_yellow;
         }
+    } else if (isSolved) {
+        gl_FragColor = foliage;
     } else {
         gl_FragColor = default_empty;
+
     }
+
+    return true;
 }
 
 vec2 normalizeMouse() {
@@ -240,16 +313,16 @@ vec2 normalizeLocation() {
         vec3 sideProjection = cross(forwardProjection, vec3(0, 0, 1));
 
         if (read_bool(KEY_UP)) {
-            base += 0.01 * forwardProjection.xy;
+            base += 0.001 * forwardProjection.xy * dt;
         }
         if (read_bool(KEY_DOWN)) {
-            base -= 0.01 * forwardProjection.xy;
+            base -= 0.001 * forwardProjection.xy * dt;
         }
         if (read_bool(KEY_LEFT)) {
-            base -= 0.01 * sideProjection.xy;
+            base -= 0.001 * sideProjection.xy * dt;
         }
         if (read_bool(KEY_RIGHT)) {
-            base += 0.01 * sideProjection.xy;
+            base += 0.001 * sideProjection.xy * dt;
         }
     }
 
@@ -264,6 +337,96 @@ vec2 normalizeRotation() {
     }
     rotation = mod(rotation + 2.0 * PI, 2.0 * PI);
     return rotation;
+}
+
+
+int renderLevel1(vec2 newMouse) {
+    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+
+    vec2 planarPosition;
+    vec3 worldPosition;
+
+    Plane puzzle = Plane(0, vec3(0, 0.5, 7), vec3(2, 0, 0), vec3(0, 2, 0));
+    Plane lightSource = Plane(1, vec3(0, 7, -9), vec3(0, 1, 1), vec3(10, 0, 0));
+
+    Plane renderables[6];
+    renderables[0] = puzzle;
+    renderables[1] = lightSource;
+
+    Plane puzzles[6];
+    puzzles[0] = puzzle;
+
+    Plane boxes[6];
+    boxes[0] = Plane(0, vec3(0, -2.0, 0), vec3(0, 0, 10), vec3(10, 0, 0));
+    boxes[1] = Plane(1, vec3(10, 3, 0), vec3(0, 5, 0), vec3(0, 0, 10));
+    boxes[2] = Plane(2, vec3(0, 3, 10), vec3(10, 0, 0), vec3(0, 5, 0));
+    boxes[3] = Plane(3, vec3(0, 3, -10), vec3(10, 0, 0), vec3(0, 5, 0));
+    boxes[4] = Plane(4, vec3(-10, 3, 0), vec3(0, 5, 0), vec3(0, 0, 10));
+    boxes[5] = Plane(5, vec3(0, 8, 0), vec3(0, 0, 10), vec3(10, 0, 0));
+
+    int found = -1;
+
+    gl_FragColor = cyan;
+    if (findIntersection(
+        focus,
+        surface_loc,
+        renderables,
+        planarPosition,
+        worldPosition,
+        found)
+    ) {
+        if (found == 0) {
+            drawPuzzle(planarPosition, newMouse);
+        } else if (found == 1) {
+            gl_FragColor = pale_yellow;
+        }
+    } else {
+        if (findIntersection(
+            focus,
+            surface_loc,
+            boxes,
+            planarPosition,
+            worldPosition,
+            found)
+        ) {
+            if (found == 0 || found == 5) {
+                gl_FragColor = gray600;
+            } if (found == 2) {
+                gl_FragColor = texture2D(introImage, (vec2(1, -1) * planarPosition + 1.0) / 2.0);
+            } else {
+                gl_FragColor = gray900;
+            }
+
+            float dx = (abs(planarPosition.x) - 0.99) * 100.0;
+            float dy = (abs(planarPosition.y) - 0.99) * 100.0;
+            if (dx > 0.0 || dy > 0.0) {
+                float amount = max(dx, dy);
+                gl_FragColor = blend(gl_FragColor, shadow);
+            }
+
+            if (findIntersection(
+                worldPosition,
+                lightSource.center,
+                puzzles,
+                planarPosition,
+                worldPosition,
+                found
+            )) {
+                gl_FragColor = blend(gl_FragColor, shadow);
+            }
+        }
+    }
+
+
+    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+        gl_FragColor = blend(gl_FragColor, cursor);
+    }
+
+    if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
+        activePuzzle = 1;
+    }
+
+    return activePuzzle;
 }
 
 void main() {
@@ -304,16 +467,9 @@ void main() {
         write_ivec3(PATH + float(i), ivec3(loc.xy, 1))
     }
 
-    vec2 where;
-    vec3 center = vec3(0, 0, 3);
-    vec3 xAxis = vec3(1, 0, 0);
-    vec3 yAxis = vec3(0, 1, 0);
+    activePuzzle = renderLevel1(newMouse);
 
-    if (read_bool(CLICK) && rayIntersectsPlane(viewport_center, center, xAxis, yAxis, where)) {
-        activePuzzle = 1;
-    }
-
-    if (read_bool(RIGHT_CLICK) && activePuzzle != 0) {
+    if (read_bool(RIGHT_CLICK)) {
         activePuzzle = 0;
     }
 
@@ -323,25 +479,4 @@ void main() {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
         return;
     }
-
-    if (rayIntersectsPlane(surface_loc, center, xAxis, yAxis, where)) {
-        where = where * 1.1;
-        float distToMouse = sqrt(pow(where.x - newMouse.x, 2.0) + pow(where.y - newMouse.y, 2.0));
-        if (distToMouse < radius) {
-            gl_FragColor = orange;
-        } else {
-            drawPuzzle(where);
-        }
-    } else if (rayIntersectsPlane(surface_loc, vec3(0, -2.0, 0), vec3(0, 0, 10), vec3(10, 0, 0), where)) {
-        gl_FragColor = foliage;
-    } else if (rayIntersectsPlane(surface_loc, vec3(0, 100, 50), vec3(0, 7, -7), vec3(10, 0, 0), where)) {
-        gl_FragColor = orange;
-    } else {
-        gl_FragColor = cyan;
-    }
-
-    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
-        gl_FragColor = vec4(gl_FragColor.rgb * (1.0 - cursor.a) + cursor.rgb * cursor.a, 1.0);
-    }
-
 }
