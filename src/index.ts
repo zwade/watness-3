@@ -2,6 +2,7 @@ import commonSource from "./shaders/common.glsl";
 import vertexSource from "./shaders/vertex.glsl";
 import fragmentSource from "./shaders/watness.glsl";
 import witnessImage from "./assets/the-witness.png";
+import treeImage from "./assets/Tree.png";
 import { AttrKind, Faery, Triangles, WatnessCanvas } from "./webgl-utils";
 import { AttribKind } from "./webgl-utils/geometry";
 import { Program } from "./webgl-utils/program";
@@ -37,11 +38,13 @@ export const main = async () => {
             resolution: AttrKind.Float2,
             loopback: AttrKind.Int4Vec,
             introImage: AttrKind.Texture,
+            treeImage: AttrKind.Texture,
         },
         {
             time: 0,
             resolution: [canvas.width, canvas.height],
             introImage: new Texture(canvas.gl, 0, witnessImage),
+            treeImage: new Texture(canvas.gl, 1, treeImage),
         }
     );
     const fullScreen = new Triangles(

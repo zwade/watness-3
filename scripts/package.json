@@ -6,6 +6,7 @@
   "dependencies": {
     "fs-extra": "^9.1.0",
     "image-parser": "^1.2.8",
+    "immutable": "^4.0.0-rc.12",
     "jpeg-js": "^0.4.3",
     "pngjs": "^6.0.0"
   },

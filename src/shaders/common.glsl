@@ -1,6 +1,6 @@
 #ifdef GL_ES
-	precision lowp float;
-	precision mediump int;
+	precision highp float;
+	precision highp int;
 #endif
 #define PATH_LEN 100
 

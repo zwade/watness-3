@@ -1,6 +1,7 @@
 uniform vec2 mouse;
 uniform vec2 footLocation;
 uniform sampler2D introImage;
+uniform sampler2D treeImage;
 
 const int width = 8;
 const int height = 8;
@@ -17,6 +18,11 @@ const vec4 gray600 = vec4(0.38, 0.49, 0.55, 1.0);
 const vec4 gray900 = vec4(0.15, 0.20, 0.22, 1.0);
 const vec4 cursor = vec4(1, 1, 1, 0.8);
 const vec4 shadow = vec4(0, 0, 0, 0.8);
+const vec4 darkGreen = vec4(0.11, 0.37, 0.13, 1.0);
+const vec4 darkOrange900 = vec4(0.76, 0.21, 0.05, 1.0);
+const vec4 orange900 = vec4(0.90, 0.32, 0.0, 1.0);
+const vec4 lightOrange900 = vec4(1.0, 0.44, 0.0, 1.0);
+const vec4 yellow900 = vec4(0.96, 0.5, 0.09, 1.0);
 
 struct Plane {
     int id;
@@ -40,6 +46,24 @@ float round(float a) {
 
 vec4 blend(vec4 base, vec4 overlay) {
     return vec4(base.rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a, 1.0);
+}
+
+float modExp (float b, float e, float m) {
+    float base = mod(b, m);
+    float result = 1.0;
+    for (int i = 0; i < 8; i++) {
+        if (mod(e, 2.0) == 1.0) {
+            result = mod(result * base, m);
+        }
+        base = mod(base * base, m);
+        e = floor(e / 2.0);
+    }
+    return result;
+}
+
+int hash(float value, float maxVal) {
+    float modRes = modExp(1021.0, value + 12.0, 4093.0);
+    return int(floor(modRes * maxVal / 4093.0));
 }
 
 bool is_node(vec2 position, out ivec2 where) {
@@ -189,7 +213,7 @@ float rayIntersectsPlane(vec3 start, vec3 end, Plane plane, out vec2 planarPosit
     return -1.0;
 }
 
-bool findIntersection(vec3 start, vec3 end, Plane planes[6], out vec2 planarPosition, out vec3 worldPosition, out int id) {
+float findIntersection(vec3 start, vec3 end, Plane planes[6], out vec2 planarPosition, out vec3 worldPosition, out int id) {
     float bestDist = -1.0;
     id = -1;
     for (int i = 0; i < 6; i++) {
@@ -203,7 +227,26 @@ bool findIntersection(vec3 start, vec3 end, Plane planes[6], out vec2 planarPosi
             worldPosition = wp;
         }
     }
-    return bestDist > 0.0;
+    return bestDist;
+}
+
+
+bool checkLevel2() {
+    for (int i = 0; i < PATH_LEN - 1; i++) {
+        ivec3 current = read_ivec3(int(PATH) + i);
+        if (current == ivec3(255, 255, 1)) {
+            return false;
+        }
+        if (current == ivec3(width - 1, height - 1, 1)) {
+            return true;
+        }
+        int value = hash(float(current.y * width + current.x), 2.0);
+        if (value != 1) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool checkLevel1() {
@@ -229,48 +272,51 @@ bool checkLevel1() {
 
     return false;
 }
-bool drawPuzzle(vec2 position, vec2 newMouse) {
-    bool isSolved = checkLevel1();
+
+vec4 drawPuzzle(vec2 position, vec2 newMouse) {
+    bool isSolved = checkLevel2();
 
     position *= 1.1;
     float distToMouse = sqrt(pow(position.x - newMouse.x, 2.0) + pow(position.y - newMouse.y, 2.0));
 
     if (distToMouse < radius) {
-        gl_FragColor = orange;
-        return true;
+        return orange;
     }
 
     ivec2 where;
     if (is_node(position, where)) {
         if (node_is_on_path(where)) {
-            gl_FragColor = orange;
-        } else {
-            gl_FragColor = pale_yellow;
+            return orange;
         }
-    } else if (is_v_edge(position, where)) {
-        if (v_edge_is_on_path(where)) {
-            gl_FragColor = orange;
-        } else {
-            if (is_h_edge(position, where) && h_edge_is_on_path(where)) {
-                gl_FragColor = orange;
-            } else {
-                gl_FragColor = pale_yellow;
-            }
-        }
-    } else if (is_h_edge(position, where)) {
-        if (h_edge_is_on_path(where)) {
-            gl_FragColor = orange;
-        } else {
-            gl_FragColor = pale_yellow;
-        }
-    } else if (isSolved) {
-        gl_FragColor = foliage;
-    } else {
-        gl_FragColor = default_empty;
 
+        return pale_yellow;
     }
 
-    return true;
+    if (is_v_edge(position, where)) {
+        if (v_edge_is_on_path(where)) {
+            return orange;
+        }
+
+        if (is_h_edge(position, where) && h_edge_is_on_path(where)) {
+            return orange;
+        }
+
+        return pale_yellow;
+    }
+
+    if (is_h_edge(position, where)) {
+        if (h_edge_is_on_path(where)) {
+            return orange;
+        }
+
+        return pale_yellow;
+    }
+
+    if (isSolved) {
+        return foliage;
+    }
+
+    return default_empty;
 }
 
 vec2 normalizeMouse() {
@@ -339,6 +385,121 @@ vec2 normalizeRotation() {
     return rotation;
 }
 
+vec4 drawFoliage(vec2 worldPosition) {
+    vec2 actual = (worldPosition * 1000.0);
+    vec2 quantized = vec2(floor(actual.x), floor(actual.y));
+    int color = hash(quantized.y + quantized.x * 8.0, 4.0);
+    float blendVal = dist(quantized + 0.5, actual);
+    vec4 base;
+
+    if (color == 0) {
+        base = darkOrange900;
+    } else if (color == 1) {
+        base = orange900;
+    } else if (color == 2) {
+        base = lightOrange900;
+    } else {
+        base = yellow900;
+    }
+
+    return base;
+}
+
+int renderLevel2(vec2 newMouse) {
+    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+
+    vec2 planarPosition;
+    vec3 worldPosition;
+
+    Plane puzzle = Plane(0, vec3(0, 0.5, 7), vec3(2, 0, 0), vec3(0, 2, 0));
+    Plane tree = Plane(1, vec3(-2, 3, 12), vec3(3.75, 0, 0), vec3(0, 5, 0));
+    Plane ground = Plane(3, vec3(0, -2.0, 0), vec3(0, 0, 100), vec3(100, 0, 0));
+
+    float timeOfDay = time / 5.0;
+
+    Plane lightSource = Plane(
+        2,
+        vec3(0, 300.0 * sin(timeOfDay), 300.0 * cos(timeOfDay)),
+        vec3(0, 42.0 * sin(timeOfDay + PI / 2.0), 42.0 * cos(timeOfDay + PI / 2.0)),
+        vec3(42, 0, 0)
+    );
+
+    Plane renderables[6];
+
+    renderables[0] = puzzle;
+    renderables[2] = lightSource;
+    renderables[3] = ground;
+
+    Plane puzzles[6];
+    puzzles[0] = puzzle;
+
+    int found = -1;
+
+    float blendVal = (cos(timeOfDay - PI / 2.0) + 1.0) / 2.0;
+
+    gl_FragColor = cyan;
+    float foundDistance = findIntersection(
+        focus,
+        surface_loc,
+        renderables,
+        planarPosition,
+        worldPosition,
+        found
+    );
+
+    if (foundDistance >= 0.0) {
+        if (found == 0) {
+            gl_FragColor = drawPuzzle(planarPosition, newMouse);
+        } else if (found == 2) {
+            gl_FragColor = pale_yellow;
+        } else if (found == 3) {
+            gl_FragColor = drawFoliage(planarPosition);
+            vec3 currentWP = worldPosition;
+
+            if (rayIntersectsPlane(
+                currentWP,
+                lightSource.center,
+                tree,
+                planarPosition,
+                worldPosition
+            ) >= 0.0) {
+                vec4 treeValue = texture2D(treeImage, (vec2(1, -1) * planarPosition + 1.0) / 2.0);
+                gl_FragColor = blend(gl_FragColor, vec4(shadow.rgb, shadow.a * treeValue.a));
+            }
+
+            if (rayIntersectsPlane(
+                currentWP,
+                lightSource.center,
+                puzzle,
+                planarPosition,
+                worldPosition
+            ) >= 0.0) {
+                gl_FragColor = blend(gl_FragColor, shadow);
+            }
+        }
+    }
+
+    float treeDistance = rayIntersectsPlane(focus, surface_loc, tree, planarPosition, worldPosition);
+    if (treeDistance >= 0.0 && (foundDistance < 0.0 || treeDistance < foundDistance)) {
+        vec4 treeColor = texture2D(treeImage, (vec2(1, -1) * planarPosition + 1.0) / 2.0);
+        gl_FragColor = blend(gl_FragColor, treeColor);
+    }
+
+    gl_FragColor =
+        gl_FragColor * (0.25 + 3.0 * blendVal / 4.0) +
+        vec4(0, 0, 0, 1.0) * (0.75 - 3.0 * blendVal / 4.0);
+
+
+    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+        gl_FragColor = blend(gl_FragColor, cursor);
+    }
+
+    if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
+        activePuzzle = 1;
+    }
+
+    return activePuzzle;
+}
 
 int renderLevel1(vec2 newMouse) {
     int activePuzzle = read_byte(ACTIVE_PUZZLE);
@@ -373,10 +534,10 @@ int renderLevel1(vec2 newMouse) {
         renderables,
         planarPosition,
         worldPosition,
-        found)
+        found) > 0.0
     ) {
         if (found == 0) {
-            drawPuzzle(planarPosition, newMouse);
+            gl_FragColor = drawPuzzle(planarPosition, newMouse);
         } else if (found == 1) {
             gl_FragColor = pale_yellow;
         }
@@ -387,7 +548,7 @@ int renderLevel1(vec2 newMouse) {
             boxes,
             planarPosition,
             worldPosition,
-            found)
+            found) >= 0.0
         ) {
             if (found == 0 || found == 5) {
                 gl_FragColor = gray600;
@@ -410,8 +571,8 @@ int renderLevel1(vec2 newMouse) {
                 puzzles,
                 planarPosition,
                 worldPosition,
-                found
-            )) {
+                found) >= 0.0
+            ) {
                 gl_FragColor = blend(gl_FragColor, shadow);
             }
         }
@@ -467,7 +628,7 @@ void main() {
         write_ivec3(PATH + float(i), ivec3(loc.xy, 1))
     }
 
-    activePuzzle = renderLevel1(newMouse);
+    activePuzzle = renderLevel2(newMouse);
 
     if (read_bool(RIGHT_CLICK)) {
         activePuzzle = 0;
