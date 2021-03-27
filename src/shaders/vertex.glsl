@@ -6,7 +6,7 @@ void main() {
 	vec4 base_position = vec4(position.xy / aspectRatio, 2, 1);
 	gl_Position = vec4(position.xyz, 1);
 
-	vec2 rotation = read_vec2(VIEW_ANGLE, 2.0 * PI);
+	vec2 rotation = read_vec2(VIEW_ANGLE, 1.0) * vec2(2.0 * PI, PI) + vec2(0, 3.0 * PI / 2.0);
 	vec2 footLocation = read_vec2(PLAYER_LOCATION, 1.0);
 
 	mat4 ud_rotation_mat = mat4(
@@ -33,7 +33,7 @@ void main() {
 	vec4 full_focus = ((vec4(0, 0, 0, 1) * ud_rotation_mat) * lr_rotation_mat) * translation_mat;
 	focus = full_focus.xyz / full_focus.w;
 
-	vec4 full_center = ((vec4(0, 0, 2.5, 1) * ud_rotation_mat) * lr_rotation_mat) * translation_mat;
+	vec4 full_center = ((vec4(0, 0, 1, 1) * ud_rotation_mat) * lr_rotation_mat) * translation_mat;
 	viewport_center = full_center.xyz / full_center.w;
 
 	vec4 result = ((base_position * ud_rotation_mat) * lr_rotation_mat) * translation_mat;
