@@ -1,3 +1,5 @@
+@include "./common.glsl"
+
 attribute vec3 position;
 attribute vec3 myInput;
 

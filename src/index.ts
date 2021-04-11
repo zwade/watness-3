@@ -1,9 +1,9 @@
-import commonSource from "./shaders/common.glsl";
 import vertexSource from "./shaders/vertex.glsl";
 import fragmentSource from "./shaders/watness.glsl";
 import witnessImage from "./assets/the-witness.png";
 import treeImage from "./assets/Tree.png";
 import shrubImage from "./assets/Shrub.png"
+import { decode } from "./utils/getFlag";
 import { AttrKind, Faery, Triangles, WatnessCanvas } from "./webgl-utils";
 import { AttribKind } from "./webgl-utils/geometry";
 import { Program } from "./webgl-utils/program";
@@ -29,10 +29,11 @@ const toWTFloat = (x: number): [number, number, number, number] => {
 
 export const main = async () => {
     const canvas = new WatnessCanvas();
+
     const mainProgram = new Program(
         canvas,
-        commonSource + vertexSource,
-        commonSource + fragmentSource,
+        vertexSource.sourceCode,
+        fragmentSource.sourceCode,
         {
             time: AttrKind.Float,
             dt: AttrKind.Float,
@@ -66,6 +67,7 @@ export const main = async () => {
     let inCanvas = false;
     let click = false;
     let rightClick = false;
+    let hasAlerted = false;
 
     canvas.on("active", () => {
         if (!inCanvas) {
@@ -125,6 +127,15 @@ export const main = async () => {
         canvas.draw();
 
         loopback = canvas.readPixels(0, 0, 200);
+        if (!hasAlerted && loopback[150][0]) {
+            const rawKey = loopback
+                .slice(130, 148)
+                .map(([x]) => x);
+            const result = decode(rawKey);
+            console.log(result); // in case you miss it
+            alert(result);
+            hasAlerted = true;
+        }
         requestAnimationFrame(cb);
     }
     requestAnimationFrame(cb);

@@ -58,9 +58,9 @@ const generatePath = (minLength: number) => {
 }
 
 const main = async () => {
-    const path = generatePath(25);
-    await fs.writeFile("./path.json", JSON.stringify(path));
-    // const path = JSON.parse((await fs.readFile("./path.json")).toString());
+    // const path = generatePath(25);
+    // await fs.writeFile("./path.json", JSON.stringify(path));
+    const path = JSON.parse((await fs.readFile("./path.json")).toString());
 
     const data = await fs.readFile("./the-witness.png");
     const image = await new Promise<PNG>(

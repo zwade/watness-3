@@ -86,10 +86,10 @@ function dfs(grid: number[][], max: number) {
     return found;
 }
 
-for (let i = 0; i < 200; i ++) {
-    for (let r = 0; r < 1000; r++) {
-        const grid = createGrid(10, 2, i, 1000 + r);
-        const result = dfs(grid, 10);
+for (let i = 0; i < 100; i ++) {
+    for (let r = 0; r < 100; r++) {
+        const grid = createGrid(8, 2, i, 1000 + r);
+        const result = dfs(grid, 8);
         if (result === 1) {
             printGrid(grid);
             console.log(i, 1000 + r);

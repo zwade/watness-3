@@ -1,4 +1,6 @@
 declare module "*.glsl" {
-    const value: string;
+    import type { GlslShader } from "webpack-glsl-minify";
+
+    const value: GlslShader;
     export default value;
 }

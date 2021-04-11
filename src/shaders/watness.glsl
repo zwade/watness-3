@@ -1,3 +1,5 @@
+@include "./common.glsl"
+
 uniform vec2 mouse;
 uniform vec2 footLocation;
 uniform sampler2D introImage;
@@ -33,6 +35,11 @@ struct Plane {
     vec3 xAxis;
     vec3 yAxis;
     int shape;
+};
+
+struct GameState {
+    bool puzzleActive;
+    bool puzzleSolved;
 };
 
 int iabs(int x) {
@@ -253,9 +260,8 @@ bool rayIntersectsCylinder(vec3 trueStart, vec3 trueEnd, vec3 center, float radi
     groundTs[1] = (-b - sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
 
     float ts[2];
-    for (int i = 0; i < 2; i++) {
-        ts[i] = groundTs[i] / sqrt(1.0 - trueRay.y * trueRay.y);
-    }
+    ts[0] = groundTs[0] / sqrt(1.0 - trueRay.y * trueRay.y);
+    ts[1] = groundTs[1] / sqrt(1.0 - trueRay.y * trueRay.y);
 
     float bestTheta;
     float bestY;
@@ -299,6 +305,36 @@ float findIntersection(vec3 start, vec3 end, Plane planes[6], out vec2 planarPos
         }
     }
     return bestDist;
+}
+
+int decodePath(int index, int len) {
+    float offset = 0.0;
+    float result = 0.0;
+    for (int i = 0; i < PATH_LEN - 1; i++) {
+        ivec3 current = read_ivec3(int(PATH) + i);
+        ivec3 next = read_ivec3(int(PATH) + i + 1);
+
+        if (next == ivec3(255, 255, 1)) {
+            return int(result);
+        }
+
+        if (mod(float(i), float(len)) == float(index)) {
+            float val;
+            ivec3 diff = next - current;
+            if (diff == ivec3(1, 0, 0)) {
+                val = 0.0;
+            } else if (diff == ivec3(-1, 0, 0)) {
+                val = 1.0;
+            } else if (diff == ivec3(0, 1, 0)) {
+                val = 2.0;
+            } else if (diff == ivec3(0, -1, 0)) {
+                val = 3.0;
+            }
+
+            result = mod(result + val * pow(2.0, offset), 16.0);
+            offset = mod(offset + 1.0, 2.0);
+        }
+    }
 }
 
 bool checkLevel3(int size) {
@@ -353,24 +389,24 @@ bool checkLevel3(int size) {
         vec3 back = vec3(previous - current);
         vec3 dir = cross(forward, back);
 
-        if (dir.z < -0.5) {
-            if (rightIdx >= 14) return false;
+        if (dir.z != 0.0) {
             for (int index = 0; index < 14; index++) {
-                if (index == rightIdx) {
-                    if (rightTurns[index] != current.xy) return false;
-                    rightIdx ++;
-                    break;
+                if (dir.z < -0.5) {
+                    if (rightIdx >= 14) return false;
+                    if (index == rightIdx) {
+                        if (rightTurns[index] != current.xy) return false;
+                        rightIdx ++;
+                        break;
+                    }
                 }
-            }
-        }
 
-        if (dir.z > 0.5) {
-            if (leftIdx >= 14) return false;
-            for (int index = 0; index < 14; index++) {
-                if (index == leftIdx) {
-                    if (leftTurns[index] != current.xy) return false;
-                    leftIdx ++;
-                    break;
+                if (dir.z > 0.5) {
+                    if (leftIdx >= 14) return false;
+                    if (index == leftIdx) {
+                        if (leftTurns[index] != current.xy) return false;
+                        leftIdx ++;
+                        break;
+                    }
                 }
             }
         }
@@ -565,8 +601,8 @@ vec3 reflect(vec3 ray, Plane plane) {
         dot(normalized, nNormalized) * nNormalized;
 }
 
-int renderLevel3(vec2 newMouse) {
-    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+GameState renderLevel3(vec2 newMouse) {
+    bool puzzleActive = read_bool(ACTIVE_PUZZLE);
     bool isSolved = checkLevel3(12);
 
     vec2 planarPosition;
@@ -677,19 +713,20 @@ int renderLevel3(vec2 newMouse) {
         }
     }
 
-    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+    if (!puzzleActive && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
         gl_FragColor = blend(gl_FragColor, cursor);
     }
 
-    if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
-        activePuzzle = 1;
+    if (read_bool(CLICK)) { // && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
+        puzzleActive = true;
     }
 
-    return activePuzzle;
+    return GameState(puzzleActive, isSolved);
 }
 
-int renderLevel2(vec2 newMouse) {
-    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+GameState renderLevel2(vec2 newMouse) {
+    bool puzzleActive = read_bool(ACTIVE_PUZZLE);
+    bool isSolved = checkLevel2(8);
 
     vec2 planarPosition;
     vec3 worldPosition;
@@ -736,7 +773,7 @@ int renderLevel2(vec2 newMouse) {
 
     if (foundDistance >= 0.0) {
         if (found == 0) {
-            gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, false);
+            gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, isSolved);
         } else if (found == 2) {
             gl_FragColor = pale_yellow;
         } else if (found == 3) {
@@ -793,19 +830,20 @@ int renderLevel2(vec2 newMouse) {
         vec4(0, 0, 0, 1.0) * (0.75 - 3.0 * blendVal / 4.0);
 
 
-    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+    if (!puzzleActive && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
         gl_FragColor = blend(gl_FragColor, cursor);
     }
 
     if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
-        activePuzzle = 1;
+        puzzleActive = true;
     }
 
-    return activePuzzle;
+    return GameState(puzzleActive, isSolved);
 }
 
-int renderLevel1(vec2 newMouse) {
-    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+GameState renderLevel1(vec2 newMouse) {
+    bool puzzleActive = read_bool(ACTIVE_PUZZLE);
+    bool isSolved = checkLevel1(8);
 
     vec2 planarPosition;
     vec3 worldPosition;
@@ -840,7 +878,7 @@ int renderLevel1(vec2 newMouse) {
         found) > 0.0
     ) {
         if (found == 0) {
-            gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, false);
+            gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, isSolved);
         } else if (found == 1) {
             gl_FragColor = pale_yellow;
         }
@@ -882,22 +920,23 @@ int renderLevel1(vec2 newMouse) {
     }
 
 
-    if (activePuzzle == 0 && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
+    if (!puzzleActive && dist(gl_FragCoord.xy, resolution / 2.0) < 4.0) {
         gl_FragColor = blend(gl_FragColor, cursor);
     }
 
     if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
-        activePuzzle = 1;
+        puzzleActive = true;
     }
 
-    return activePuzzle;
+    return GameState(puzzleActive, isSolved);
 }
 
 void main() {
     vec4 empty = default_empty;
 
-    int puzzle = 2;
+    int puzzle = read_byte(ACTIVE_LEVEL);
     int size;
+
 
     if (puzzle == 0) size = 8;
     if (puzzle == 1) size = 8;
@@ -906,7 +945,12 @@ void main() {
     vec2 newMouse = normalizeMouse(size);
     vec2 newLocation = normalizeLocation();
     vec2 rotation = normalizeRotation();
-    int activePuzzle = read_byte(ACTIVE_PUZZLE);
+    bool puzzleActive = read_bool(ACTIVE_PUZZLE);
+
+    GameState state;
+    if (puzzle == 0) state = renderLevel1(newMouse);
+    if (puzzle == 1) state = renderLevel2(newMouse);
+    if (puzzle == 2) state = renderLevel3(newMouse);
 
     write_float(MOUSE_LOCATION, newMouse.x / 2.0 + 0.5, 1.0)
     write_float(MOUSE_LOCATION + 1.0, newMouse.y / 2.0 + 0.5, 1.0)
@@ -925,28 +969,61 @@ void main() {
     }
     for (int i = 0; i < PATH_LEN; i++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
+
         if (loc.z == 0) {
             write_ivec3(PATH + float(i), ivec3(255, 255, 1))
-        }
-        if (i == next_segment) {
-            ivec2 nextNode;
-            if (is_node(newMouse, size, nextNode) && is_valid_next_segment(nextNode, size)) {
-                write_ivec3(PATH + float(i), ivec3(nextNode.xy, 1))
+        } else if (i == 0) {
+            write_ivec3(PATH + float(i), ivec3(0, 0, 1));
+        } else if (state.puzzleActive) {
+            if (i == next_segment) {
+                ivec2 nextNode;
+                if (!state.puzzleSolved && is_node(newMouse, size, nextNode) && is_valid_next_segment(nextNode, size)) {
+                    write_ivec3(PATH + float(i), ivec3(nextNode.xy, 1))
+                }
             }
+        } else if (!state.puzzleSolved) {
+            write_ivec3(PATH + float(i), ivec3(255, 255, 1));
         }
 
         write_ivec3(PATH + float(i), ivec3(loc.xy, 1))
     }
 
-    if (puzzle == 0) activePuzzle = renderLevel1(newMouse);
-    if (puzzle == 1) activePuzzle = renderLevel2(newMouse);
-    if (puzzle == 2) activePuzzle = renderLevel3(newMouse);
+    for (int i = 0; i < 6; i++) {
+        if (puzzle == 0 && state.puzzleSolved) {
+            write_byte(SOLUTION1 + float(i), decodePath(i, 6));
+        }
 
-    if (read_bool(RIGHT_CLICK)) {
-        activePuzzle = 0;
+        if (puzzle == 1 && state.puzzleSolved) {
+            write_byte(SOLUTION2 + float(i), decodePath(i, 6));
+        }
+
+        if (puzzle == 2 && state.puzzleSolved) {
+            write_byte(SOLUTION3 + float(i), decodePath(i, 6));
+        }
+
+        write_byte(SOLUTION1 + float(i), read_byte(int(SOLUTION1) + i));
+        write_byte(SOLUTION2 + float(i), read_byte(int(SOLUTION2) + i));
+        write_byte(SOLUTION3 + float(i), read_byte(int(SOLUTION3) + i));
     }
 
-    write_byte(ACTIVE_PUZZLE, activePuzzle);
+    vec3 worldPosition;
+    vec2 planarPosition;
+    Plane exit = Plane(0, vec3(0, 0, -10), vec3(0, 3, 0), vec3(2, 0, 0), 1);
+    if (state.puzzleSolved && rayIntersectsPlane(focus, surface_loc, exit, planarPosition, worldPosition) >= 0.0) {
+        gl_FragColor = blend(gl_FragColor, vec4(1, 1, 1, 0.95));
+    }
+
+    if (state.puzzleSolved && dist(viewport_center, exit.center) < 2.0) {
+        puzzle = puzzle + 1;
+    }
+
+    if (read_bool(RIGHT_CLICK)) {
+        state.puzzleActive = false;
+    }
+
+    write_bool(ACTIVE_PUZZLE, state.puzzleActive);
+    write_byte(ACTIVE_LEVEL, puzzle);
+    write_bool(COMPLETE, (puzzle == 3));
 
     if (gl_FragCoord.y <= 1.0) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);

@@ -2,7 +2,6 @@
 	precision highp float;
 	precision highp int;
 #endif
-#define PATH_LEN 100
 
 uniform float time;
 uniform float dt;
@@ -14,18 +13,25 @@ varying vec3 color;
 varying vec3 focus;
 varying vec3 viewport_center;
 
-#define PATH 0.0
-#define MOUSE_LOCATION 100.0
-#define PLAYER_LOCATION 102.0
-#define VIEW_ANGLE 104.0
-#define ACTIVE_PUZZLE 120.0
-#define KEY_LEFT 200.0
-#define KEY_RIGHT 201.0
-#define KEY_UP 202.0
-#define KEY_DOWN 203.0
-#define CLICK 204.0
-#define RIGHT_CLICK 205.0
-#define MOUSE_DELTA 210.0
+@define PATH_LEN 100
+
+@define PATH 0.0
+@define MOUSE_LOCATION 100.0
+@define PLAYER_LOCATION 102.0
+@define VIEW_ANGLE 104.0
+@define ACTIVE_PUZZLE 120.0
+@define ACTIVE_LEVEL 121.0
+@define SOLUTION1 130.0
+@define SOLUTION2 136.0
+@define SOLUTION3 142.0
+@define COMPLETE 150.0
+@define KEY_LEFT 200.0
+@define KEY_RIGHT 201.0
+@define KEY_UP 202.0
+@define KEY_DOWN 203.0
+@define CLICK 204.0
+@define RIGHT_CLICK 205.0
+@define MOUSE_DELTA 210.0
 
 #define imin(x,y) (x < y ? x : y)
 #define minmax(x, minval, maxval) (min(max(x, minval), maxval))
@@ -61,10 +67,6 @@ vec3 toWTFloat(float x) {
         floor(mod(bigboi, 256.0)) / 256.0
     );
 }
-
-
-
-
 
 
 

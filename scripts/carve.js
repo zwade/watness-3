@@ -86,22 +86,22 @@ var generatePath = function (minLength) {
     throw new Error("Could not generate path");
 };
 var main = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var path, data, image, i, px, py, y, x, nx, ny, distance;
-    return __generator(this, function (_a) {
-        switch (_a.label) {
+    var path, _a, _b, data, image, i, px, py, y, x, nx, ny, distance;
+    return __generator(this, function (_c) {
+        switch (_c.label) {
             case 0:
-                path = generatePath(25);
-                return [4 /*yield*/, fs.writeFile("./path.json", JSON.stringify(path))];
+                _b = (_a = JSON).parse;
+                return [4 /*yield*/, fs.readFile("./path.json")];
             case 1:
-                _a.sent();
+                path = _b.apply(_a, [(_c.sent()).toString()]);
                 return [4 /*yield*/, fs.readFile("./the-witness.png")];
             case 2:
-                data = _a.sent();
+                data = _c.sent();
                 return [4 /*yield*/, new Promise(function (resolve) {
                         var img = new pngjs_1.PNG().parse(data, function () { return resolve(img); });
                     })];
             case 3:
-                image = _a.sent();
+                image = _c.sent();
                 for (i = 0; i < path.length - 1; i++) {
                     px = (path[i][0] + path[i + 1][0]) / (2 * puzzleWidth);
                     py = (path[i][1] + path[i + 1][1]) / (2 * puzzleHeight);

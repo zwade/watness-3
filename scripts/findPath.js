@@ -71,10 +71,10 @@ function dfs(grid, max) {
     rec([[0, 0]], immutable_1.Set([0]));
     return found;
 }
-for (var i = 0; i < 200; i++) {
-    for (var r = 0; r < 1000; r++) {
-        var grid = createGrid(10, 2, i, 1000 + r);
-        var result = dfs(grid, 10);
+for (var i = 0; i < 100; i++) {
+    for (var r = 0; r < 100; r++) {
+        var grid = createGrid(8, 2, i, 1000 + r);
+        var result = dfs(grid, 8);
         if (result === 1) {
             printGrid(grid);
             console.log(i, 1000 + r);
