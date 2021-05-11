@@ -6,7 +6,7 @@
 uniform float time;
 uniform float dt;
 uniform vec2 resolution;
-uniform ivec4 loopback[300];
+uniform ivec4 loopback[250];
 
 varying vec3 surface_loc;
 varying vec3 color;

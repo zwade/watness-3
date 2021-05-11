@@ -79,7 +79,7 @@ export class WatnessCanvas extends EventManager<WatnessEvents> {
         canvas.width = this.canvas.clientWidth;
         canvas.height = this.canvas.clientHeight;
 
-        const gl = canvas.getContext("webgl2");
+        const gl = canvas.getContext("webgl") as WebGL2RenderingContext | null;
         if (!gl) {
             throw new Error("Failed to get WebGL context")
         }

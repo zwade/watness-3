@@ -9,8 +9,8 @@ uniform sampler2D shrubImage;
 const float radius = 0.03;
 const float scale = 0.50;
 
-const vec4 pale_yellow = vec4(1.0, 1.0, 0.8, 1.0);
-const vec4 default_empty = vec4(1.0, 0.0, 0.2, 1.0);
+const vec4 paleYellow = vec4(1.0, 1.0, 0.8, 1.0);
+const vec4 defaultEmpty = vec4(1.0, 0.0, 0.2, 1.0);
 const vec4 orange = vec4(1.0, 0.6, 0.0, 1.0);
 const vec4 cyan = vec4(0, 0.67, 0.76, 1.0);
 const vec4 foliage = vec4(0.22, 0.56, 0.24, 1.0);
@@ -82,7 +82,7 @@ int hash(float value, float maxVal) {
     return int(floor(modRes * maxVal / 4093.0));
 }
 
-bool is_node(vec2 position, int size, out ivec2 where) {
+bool isNode(vec2 position, int size, out ivec2 where) {
     for (int i = 0; i < MAX_SIZE; i++) {
 	    for (int j = 0; j < MAX_SIZE; j++) {
             if (i >= size || j >= size) continue;
@@ -101,7 +101,7 @@ bool is_node(vec2 position, int size, out ivec2 where) {
 	return false;
 }
 
-bool is_v_edge(vec2 position, int size, out ivec2 where) {
+bool isVEdge(vec2 position, int size, out ivec2 where) {
     for (int i = 0; i < MAX_SIZE; i++) {
 	    for (int j = 0; j < MAX_SIZE - 1; j++) {
             if (i >= size || j >= size - 1) continue;
@@ -127,7 +127,7 @@ bool is_v_edge(vec2 position, int size, out ivec2 where) {
 	return false;
 }
 
-bool is_h_edge(vec2 position, int size, out ivec2 where) {
+bool isHEdge(vec2 position, int size, out ivec2 where) {
     for (int i = 0; i < MAX_SIZE - 1; i++) {
 	    for (int j = 0; j < MAX_SIZE; j++) {
             if (i >= size - 1 || j >= size) continue;
@@ -153,7 +153,7 @@ bool is_h_edge(vec2 position, int size, out ivec2 where) {
 	return false;
 }
 
-bool node_is_on_path(ivec2 where, int size) {
+bool nodeIsOnPath(ivec2 where, int size) {
     for (int i = 0; i < PATH_LEN; i ++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
         if (loc == ivec3(255, 255, 1)) {
@@ -166,7 +166,7 @@ bool node_is_on_path(ivec2 where, int size) {
     return false;
 }
 
-bool v_edge_is_on_path(ivec2 where, int size) {
+bool vEdgeIsOnPath(ivec2 where, int size) {
     for (int i = 0; i < PATH_LEN - 1; i++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
         ivec3 next = read_ivec3(int(PATH) + i + 1);
@@ -180,7 +180,7 @@ bool v_edge_is_on_path(ivec2 where, int size) {
     return false;
 }
 
-bool h_edge_is_on_path(ivec2 where, int size) {
+bool hEdgeIsOnPath(ivec2 where, int size) {
     for (int i = 0; i < PATH_LEN - 1; i ++) {
         ivec3 loc = read_ivec3(int(PATH) + i);
         ivec3 next = read_ivec3(int(PATH) + i + 1);
@@ -194,7 +194,7 @@ bool h_edge_is_on_path(ivec2 where, int size) {
     return false;
 }
 
-bool is_valid_next_segment(ivec2 where, int size) {
+bool isValidNextSegment(ivec2 where, int size) {
     if (where.x < 0 || where.y < 0 || where.x >= size || where.y >= size) {
         return false;
     }
@@ -381,7 +381,7 @@ bool checkLevel3(int size) {
             return false;
         }
 
-        if (next == ivec3(size - 1, size - 1, 1)) {
+        if (next == ivec3(size - 1, size - 1, 1) && leftIdx == 14 && rightIdx == 14) {
             return true;
         }
 
@@ -466,39 +466,39 @@ vec4 drawPuzzle(vec2 position, vec2 newMouse, int size, bool isSolved) {
     }
 
     ivec2 where;
-    if (is_node(position, size, where)) {
-        if (node_is_on_path(where, size)) {
+    if (isNode(position, size, where)) {
+        if (nodeIsOnPath(where, size)) {
             return orange;
         }
 
-        return pale_yellow;
+        return paleYellow;
     }
 
-    if (is_v_edge(position, size, where)) {
-        if (v_edge_is_on_path(where, size)) {
+    if (isVEdge(position, size, where)) {
+        if (vEdgeIsOnPath(where, size)) {
             return orange;
         }
 
-        if (is_h_edge(position, size, where) && h_edge_is_on_path(where, size)) {
+        if (isHEdge(position, size, where) && hEdgeIsOnPath(where, size)) {
             return orange;
         }
 
-        return pale_yellow;
+        return paleYellow;
     }
 
-    if (is_h_edge(position, size, where)) {
-        if (h_edge_is_on_path(where, size)) {
+    if (isHEdge(position, size, where)) {
+        if (hEdgeIsOnPath(where, size)) {
             return orange;
         }
 
-        return pale_yellow;
+        return paleYellow;
     }
 
     if (isSolved) {
         return foliage;
     }
 
-    return default_empty;
+    return defaultEmpty;
 }
 
 vec2 normalizeMouse(int size) {
@@ -692,7 +692,7 @@ GameState renderLevel3(vec2 newMouse) {
 
             gl_FragColor = blend(blue800, vec4(foundColor.rgb, foundColor.a / 2.0));
         } else if (found == 4) {
-            gl_FragColor = pale_yellow;
+            gl_FragColor = paleYellow;
         } else if (found == 5) {
             gl_FragColor = gray600;
         }
@@ -717,7 +717,7 @@ GameState renderLevel3(vec2 newMouse) {
         gl_FragColor = blend(gl_FragColor, cursor);
     }
 
-    if (read_bool(CLICK)) { // && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
+    if (read_bool(CLICK) && rayIntersectsPlane(focus, viewport_center, puzzle, planarPosition, worldPosition) >= 0.0) {
         puzzleActive = true;
     }
 
@@ -775,7 +775,7 @@ GameState renderLevel2(vec2 newMouse) {
         if (found == 0) {
             gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, isSolved);
         } else if (found == 2) {
-            gl_FragColor = pale_yellow;
+            gl_FragColor = paleYellow;
         } else if (found == 3) {
             gl_FragColor = drawFoliage(planarPosition);
             vec3 currentWP = worldPosition;
@@ -880,7 +880,7 @@ GameState renderLevel1(vec2 newMouse) {
         if (found == 0) {
             gl_FragColor = drawPuzzle(planarPosition, newMouse, 8, isSolved);
         } else if (found == 1) {
-            gl_FragColor = pale_yellow;
+            gl_FragColor = paleYellow;
         }
     } else {
         if (findIntersection(
@@ -932,7 +932,7 @@ GameState renderLevel1(vec2 newMouse) {
 }
 
 void main() {
-    vec4 empty = default_empty;
+    vec4 empty = defaultEmpty;
 
     int puzzle = read_byte(ACTIVE_LEVEL);
     int size;
@@ -977,7 +977,7 @@ void main() {
         } else if (state.puzzleActive) {
             if (i == next_segment) {
                 ivec2 nextNode;
-                if (!state.puzzleSolved && is_node(newMouse, size, nextNode) && is_valid_next_segment(nextNode, size)) {
+                if (!state.puzzleSolved && isNode(newMouse, size, nextNode) && isValidNextSegment(nextNode, size)) {
                     write_ivec3(PATH + float(i), ivec3(nextNode.xy, 1))
                 }
             }

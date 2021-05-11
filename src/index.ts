@@ -93,7 +93,7 @@ export const main = async () => {
     });
 
     const cb = (d: number) => {
-        const events = Array.from(new Array(100), (): [number, number, number, number] => [0, 0, 0, 0]);
+        const events = Array.from(new Array(50), (): [number, number, number, number] => [0, 0, 0, 0]);
         const dt = d - previousTime;
         previousTime = d;
 

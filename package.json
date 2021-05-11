@@ -26,10 +26,10 @@
     "typescript": "^4.1.5",
     "webpack": "^5.21.2",
     "webpack-cli": "^4.5.0",
-    "webpack-dev-server": "^3.11.2",
-    "webpack-glsl-minify": "^1.4.2"
+    "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "aes-js": "^3.1.2"
+    "aes-js": "^3.1.2",
+    "webpack-glsl-minify": "https://github.com/zwade/webpack-glsl-minify"
   }
 }
